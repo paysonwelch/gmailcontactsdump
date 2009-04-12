@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Google.GData.Contacts;
 using System.IO;
+using OutLook = Microsoft.Office.Interop.Outlook;
 
 namespace contactsdump
 {
@@ -15,6 +16,7 @@ namespace contactsdump
 What do you want?
     1. Transfer from one gmail account to another
     2. Consolidation one gmail account
+    3. Dump one gmail account's contacts to your local Outlook
 Please type in the number and hit enter (default 1)";
             Console.WriteLine(whatDoYouWant);
 
@@ -26,9 +28,74 @@ Please type in the number and hit enter (default 1)";
                 case "2":
                     Consolidate();
                     break;
+                case "3":
+                    DumpToOutlook();
+                    break;
                 default:
                     Transfer();
                     break;
+            }
+        }
+
+        private static void DumpToOutlook()
+        {
+            ContactsService srcService = new ContactsService("src");
+            string srcUsername = string.Empty;
+            string srcPassword = string.Empty;
+            Console.WriteLine("Type in source user name:");
+            srcUsername = Console.ReadLine();
+            Console.WriteLine("Type in source password:");
+            Console.ForegroundColor = ConsoleColor.Black;
+            srcPassword = Console.ReadLine();
+            Console.ForegroundColor = ConsoleColor.Gray;
+
+            srcService.Credentials = new Google.GData.Client.GDataCredentials(srcUsername, srcPassword);
+
+            var query = new ContactsQuery(ContactsQuery.CreateContactsUri("default"));
+            query.NumberToRetrieve = 10000;
+            var results = srcService.Query(query);
+
+            Dictionary<string, List<ContactEntry>> workBench = new Dictionary<string, List<ContactEntry>>();
+            foreach (ContactEntry r in results.Entries)
+            {
+                Console.WriteLine(r.Title.Text);
+                var app = new OutLook.ApplicationClass();
+                var contactFolder = app.Session.GetDefaultFolder(Microsoft.Office.Interop.Outlook.OlDefaultFolders.olFolderContacts);
+                var newContact = contactFolder.Items.Add(OutLook.OlItemType.olContactItem) as OutLook.ContactItem;
+
+                newContact.FullName = r.Title.Text;
+                //phone
+                if (r.Phonenumbers.Count > 3)
+                {
+                    newContact.Home2TelephoneNumber = r.Phonenumbers[3].Value;
+                }
+                if (r.Phonenumbers.Count > 2)
+                {
+                    newContact.HomeTelephoneNumber = r.Phonenumbers[2].Value;
+                }
+                if (r.Phonenumbers.Count > 1)
+                {
+                    newContact.Business2TelephoneNumber = r.Phonenumbers[1].Value;
+                }
+                if (r.Phonenumbers.Count > 0)
+                {
+                    newContact.BusinessTelephoneNumber = r.Phonenumbers[0].Value;
+                }
+                //email
+                if (r.Emails.Count > 2)
+                {
+                    newContact.Email3Address = r.Emails[2].Address;
+                }
+                if (r.Emails.Count > 1)
+                {
+                    newContact.Email2Address = r.Emails[1].Address;
+                }
+                if (r.Emails.Count > 0)
+                {
+                    newContact.Email1Address = r.Emails[0].Address;
+                }
+
+                newContact.Save();
             }
         }
 
